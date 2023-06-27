@@ -593,6 +593,7 @@ int
 #else
 	main(argc, argv)
 #endif
+/* RDT: 20230626 - Ponto de entrada do servidor. */
 i4	argc;
 char	**argv;
 {
