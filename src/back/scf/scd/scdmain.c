@@ -597,16 +597,16 @@ int
 i4	argc;
 char	**argv;
 {
-	DB_STATUS		status;
-	STATUS      ret_status;
-  CL_ERR_DESC cl_err;
-  CS_CB				ccb;
-  i4					err_code;
-  i4					num_sessions = 0;
-  char				*tran_place = 0;
-  char				*server_type = "dbms";
-  char				*server_flavor = "*";
-  char				*host;
+  DB_STATUS    status;
+  STATUS       ret_status;
+  CL_ERR_DESC  cl_err;
+  CS_CB        ccb;
+  i4           err_code;
+  i4           num_sessions = 0;
+  char         *tran_place = 0;
+  char         *server_type = "dbms";
+  char         *server_flavor = "*";
+  char         *host;
 
 #ifndef	II_DMF_MERGE
   MEadvise(ME_INGRES_ALLOC);
@@ -618,25 +618,25 @@ char	**argv;
   ** Stash args.
   */
 
-  if( argc > 1 )
-	  server_type = argv[1];
+  if (argc > 1)
+    server_type = argv[1];
 
   Sc_server_name = ERx("default");
 
-  if( argc > 2 )
+  if (argc > 2)
   {
-	  server_flavor = argv[2];
+    server_flavor = argv[2];
     Sc_server_name = argv[2];
   }
 
   /* Set CM character set stuff */
-
   ret_status = CMset_charset(&cl_err);
+
   if ( ret_status != OK)
   {
-	  uleFormat(NULL, E_UL0016_CHAR_INIT, &cl_err, ULE_LOG ,
-	    NULL, (char * )0, 0L, (i4 *)0, &err_code, 0);
-	  PCexit(FAIL);
+    uleFormat(NULL, E_UL0016_CHAR_INIT, &cl_err, ULE_LOG ,
+      NULL, (char * )0, 0L, (i4 *)0, &err_code, 0);
+    PCexit(FAIL);
   }
 
   /*
@@ -648,33 +648,33 @@ char	**argv;
   **	recovery -> RCP
   */
 
-  if( !STcasecmp( server_type, "dbms" ) )
+  if (!STcasecmp( server_type, "dbms"))
   {
-	  Sc_server_type = SC_INGRES_SERVER;
+    Sc_server_type = SC_INGRES_SERVER;
   }
-  else if( !STcasecmp( server_type, "rms" ) )
+  else if (!STcasecmp( server_type, "rms"))
   {
-	  Sc_server_type = SC_RMS_SERVER;
+    Sc_server_type = SC_RMS_SERVER;
   }
   else if( !STcasecmp( server_type, "star" ) )
   {
-	  Sc_server_type = SC_STAR_SERVER;
+    Sc_server_type = SC_STAR_SERVER;
   }
   else if( !STcasecmp( server_type, "recovery" ) )
   {
-	  Sc_server_type = SC_RECOVERY_SERVER;
+    Sc_server_type = SC_RECOVERY_SERVER;
   }
   else if( !STcasecmp( server_type, "iomaster" ) )
   {
-	  Sc_server_type = SC_IOMASTER_SERVER;  
+    Sc_server_type = SC_IOMASTER_SERVER;  
   }
   else
   {
-	  sc0ePut(E_SC0346_DBMS_PARAMETER_ERROR, (DB_ERROR *)NULL,
+    sc0ePut(E_SC0346_DBMS_PARAMETER_ERROR, (DB_ERROR *)NULL,
       (CL_ERR_DESC*)NULL, (i4)1, (i4)0, (PTR)server_type);
 	  sc0ePut(E_SC0124_SERVER_INITIATE, (DB_ERROR *)NULL, 
       (CL_ERR_DESC *)NULL, 0);
-	  PCexit(FAIL);
+    PCexit(FAIL);
   }
 
   /*
@@ -684,17 +684,17 @@ char	**argv;
   
   switch( (status = PMload((LOCATION *)NULL, scd_pmerr_func)))
   {
-	  case OK:
-	    /* Loaded sucessfully */
-	    break;
-	  case PM_FILE_BAD:
-	    /* syntax error */
-	    sc0ePut(E_SC032B_BAD_PM_FILE, (DB_ERROR *)NULL, NULL, 0);
-        PCexit(FAIL);
-	  default: 
-	    /* unable to open file */
-	    sc0ePut(status, (DB_ERROR *)NULL, NULL, 0);
-	    sc0ePut(E_SC032C_NO_PM_FILE, (DB_ERROR *)NULL, NULL, 0);
+    case OK:
+      /* Loaded sucessfully */
+      break;
+    case PM_FILE_BAD:
+      /* syntax error */
+      sc0ePut(E_SC032B_BAD_PM_FILE, (DB_ERROR *)NULL, NULL, 0);
+      PCexit(FAIL);
+    default: 
+      /* unable to open file */
+      sc0ePut(status, (DB_ERROR *)NULL, NULL, 0);
+      sc0ePut(E_SC032C_NO_PM_FILE, (DB_ERROR *)NULL, NULL, 0);
       PCexit(FAIL);
   }
   /*
@@ -715,7 +715,6 @@ char	**argv;
   /* For Star, check II_STAR_LOG first, use II_DBMS_LOG if former
   ** is not defined.
   */
-
   switch( Sc_server_type )
   {
     case SC_INGRES_SERVER:	  NMgtAt("II_DBMS_LOG", &tran_place); break;
@@ -738,61 +737,62 @@ char	**argv;
 
   for (;;)
   {
-	  ccb.cs_scnt = num_sessions;
-	  ccb.cs_ascnt = num_sessions;
-	  ccb.cs_stksize = 65536;		    /* {@fix_me@} random at the moment */
-	  ccb.cs_stkcache = FALSE;
-	  ccb.cs_scballoc = scd_alloc_scb;
-	  ccb.cs_scbdealloc = scd_dealloc_scb;
-	  ccb.cs_elog = sc0e_putAsFcn;
-	  ccb.cs_process = scs_sequencer;
-	  ccb.cs_startup = scd_initiate;
-	  ccb.cs_shutdown = scd_terminate;
-	  ccb.cs_attn = scs_attn;
-	  ccb.cs_format = scs_format;
-	  ccb.cs_facility = scs_facility;
-	  ccb.cs_read = scc_recv;
-	  ccb.cs_write = scc_send;
-	  ccb.cs_saddr = scd_get_assoc;
-	  ccb.cs_reject = scd_reject_assoc;
-	  ccb.cs_disconnect = scd_disconnect;
+    ccb.cs_scnt = num_sessions;
+    ccb.cs_ascnt = num_sessions;
+    ccb.cs_stksize = 65536;		    /* {@fix_me@} random at the moment */
+    ccb.cs_stkcache = FALSE;
+    ccb.cs_scballoc = scd_alloc_scb;
+    ccb.cs_scbdealloc = scd_dealloc_scb;
+    ccb.cs_elog = sc0e_putAsFcn;
+    ccb.cs_process = scs_sequencer;
+    ccb.cs_startup = scd_initiate;
+    ccb.cs_shutdown = scd_terminate;
+    ccb.cs_attn = scs_attn;
+    ccb.cs_format = scs_format;
+    ccb.cs_facility = scs_facility;
+    ccb.cs_read = scc_recv;
+    ccb.cs_write = scc_send;
+    ccb.cs_saddr = scd_get_assoc;
+    ccb.cs_reject = scd_reject_assoc;
+    ccb.cs_disconnect = scd_disconnect;
     ccb.cs_scbattach = scs_scb_attach;
     ccb.cs_scbdetach = scs_scb_detach;
-	  ccb.cs_diag = scd_diag;
-	  ccb.cs_get_rcp_pid = LGrcp_pid;
-	  ccb.cs_format_lkkey = LKkey_to_string;
+    ccb.cs_diag = scd_diag;
+    ccb.cs_get_rcp_pid = LGrcp_pid;
+    ccb.cs_format_lkkey = LKkey_to_string;
 
-	  argc = 1;
-
-	  status = CSinitiate(&argc, &argv, &ccb);
-	  if (status)
-	  {
-	    SIstd_write(SI_STD_OUT, "FAIL\n");
-	    uleFormat(NULL, status, (CL_ERR_DESC *)NULL, ULE_LOG, (DB_SQLSTATE *) NULL,
-	  	(char *)0, (i4)0, (i4 *)0, &err_code, 0);
-	    break;
-	  }
+    argc = 1;
+    status = CSinitiate(&argc, &argv, &ccb);
+	  
+    if (status)
+    {
+      SIstd_write(SI_STD_OUT, "FAIL\n");
+      uleFormat(NULL, status, (CL_ERR_DESC *)NULL, ULE_LOG, (DB_SQLSTATE *) NULL,
+	(char *)0, (i4)0, (i4 *)0, &err_code, 0);
+      break;
+    }
 
 #ifdef UNIX
-  /*
-	** ??? Note:  This code should be generalized by adding the test to
-	** ??? every CL's version of CSdispatch() or CSinitiate().  Or, a new
-	** ??? CL interface routine (added on all platforms) could return the
-	** ??? required information.  Do not document for users 'til this is
-	** ??? fixed.
-	*/
-	  if (Sc_server_type == SC_IOMASTER_SERVER && Cs_numprocessors <=1)
-	  {
-	    /* do not allow IOMASTER server to run on uni-processor */
-	    sc0ePut(E_SC0369_IOMASTER_BADCPU, (DB_ERROR *)NULL, NULL, 0);
-	    PCexit(FAIL);
-	  }
+    /*
+    ** ??? Note:  This code should be generalized by adding the test to
+    ** ??? every CL's version of CSdispatch() or CSinitiate().  Or, a new
+    ** ??? CL interface routine (added on all platforms) could return the
+    ** ??? required information.  Do not document for users 'til this is
+    ** ??? fixed.
+    */
+    if (Sc_server_type == SC_IOMASTER_SERVER && Cs_numprocessors <=1)
+    {
+      /* do not allow IOMASTER server to run on uni-processor */
+      sc0ePut(E_SC0369_IOMASTER_BADCPU, (DB_ERROR *)NULL, NULL, 0);
+      PCexit(FAIL);
+    }
 #endif /* UNIX */
 
- 	  scs_mo_init();
- 	  status = CSdispatch();
- 	  TRdisplay("CSdispatch() = %x\n", status);
- 	  break;
+    scs_mo_init();
+    /* RDT: 20230705 - CSdispatch, como já investigado é a sequência das atividades no server. */
+    status = CSdispatch();
+    TRdisplay("CSdispatch() = %x\n", status);
+    break;
   }
 
   TRset_file(TR_F_CLOSE, 0, 0, &cl_err);
