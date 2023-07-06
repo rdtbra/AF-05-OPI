@@ -2884,6 +2884,7 @@ GLOBALREF        char    *MElimit;
 
 STATUS
 IICSdispatch(void)
+/* RDT: 20230706 - entendo que este c√≥digo do dispatcher √© parte bastante importante no processo do servidor. */
 {
   STATUS     status = 0;
   STATUS		 ret_val;
@@ -3330,7 +3331,7 @@ IICSdispatch(void)
 	  /* Committed; set up right semaphores for MU */
 	  MUset_funcs( MUcs_sems() );
 
-		/* RDT: 2021-05-12 - Parece que estamos chamando uma funÁ„o que coloca o servidor em modo usu·rio, o que quer que isso
+		/* RDT: 2021-05-12 - Parece que estamos chamando uma fun√ß√£o que coloca o servidor em modo usu√°rio, o que quer que isso
 		   signifique realmente. */
 	  CS_swuser();
 
