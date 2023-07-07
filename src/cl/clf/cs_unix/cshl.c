@@ -1038,59 +1038,59 @@ GLOBALDEF i4 Cs_polltimeout = 30000;
 
 CS_SCB	*
 CS_xchng_thread(CS_SCB *scb)
+/* RDT: 20230706 - Pelo nome da função, troca a thread em execução. O comentário informa que a próxima scb
+   deve ser executada (scb - session control block). */
 {
-    register i4         i;
-    register CS_SCB	*new_scb = NULL;
-    CS_SCB		*old_scb = Cs_srv_block.cs_current;
-    i4			nevents, tim;
-    CL_ERR_DESC		errcode;
+  register i4 i;
+  register CS_SCB *new_scb = NULL;
+  CS_SCB *old_scb = Cs_srv_block.cs_current;
+  i4 nevents, tim;
+  CL_ERR_DESC errcode;
 #ifdef	CS_STACK_SHARING
-    i4			oo_stacks = 0;
+  i4 oo_stacks = 0;
 #endif
 
 # if defined(sparc_sol)
 # define gotit
-    if (scb &&
-	scb->cs_registers[CS_SP] <=
-	(SCALARP)scb->cs_stk_area + sizeof(CS_STK_CB) + 64)
+  if (scb &&
+    scb->cs_registers[CS_SP] <=
+    (SCALARP)scb->cs_stk_area + sizeof(CS_STK_CB) + 64)
 # endif
 
 # if defined(usl_us5) || defined(sgi_us5) || defined(int_lnx) || defined(int_rpl)
 # define gotit
-    if (scb &&
-	scb->cs_sp <=
-	(SCALARP)scb->cs_stk_area + sizeof(CS_STK_CB) + 64)
+  if (scb &&
+    scb->cs_sp <=
+    (SCALARP)scb->cs_stk_area + sizeof(CS_STK_CB) + 64)
 # endif
 
 # if defined(hp8_us5) || defined(hpb_us5) || defined(hp2_us5)
 # define gotit
-    if (scb && CS_check_stack(&scb->cs_mach))
+  if (scb && CS_check_stack(&scb->cs_mach))
 # endif
 
 # if defined(any_aix) && defined(BUILD_ARCH32)
 # define gotit
-    if (scb && scb->cs_registers[CS_SP] <=
-			(SCALARP)scb->cs_stk_area + sizeof(CS_STK_CB) + 64)
+  if (scb && scb->cs_registers[CS_SP] <=
+    (SCALARP)scb->cs_stk_area + sizeof(CS_STK_CB) + 64)
 # endif /* aix32 */
 
 # if defined(any_aix) && defined(BUILD_ARCH64)
 # define gotit
-     if (scb && scb->cs_registers[CS_SP] <=
-                       (SCALARP)scb->cs_stk_area + sizeof(CS_STK_CB) + 128)
+  if (scb && scb->cs_registers[CS_SP] <=
+    (SCALARP)scb->cs_stk_area + sizeof(CS_STK_CB) + 128)
 # endif /* aix64 */
 
 #if defined(axp_osf) || defined(axp_lnx)
 # define gotit
-    if (scb && scb->cs_sp <=
-                        (SCALARP)scb->cs_stk_area + sizeof(CS_STK_CB) + 128)
-
+  if (scb && scb->cs_sp <=
+    (SCALARP)scb->cs_stk_area + sizeof(CS_STK_CB) + 128)
 # endif /* axp_osf */
 
 # if defined(ibm_lnx)
 # define gotit
-    if (scb && scb->cs_registers[CS_SP] <=
-                        (SCALARP)scb->cs_stk_area + sizeof(CS_STK_CB) + 128)
-
+  if (scb && scb->cs_registers[CS_SP] <=
+    (SCALARP)scb->cs_stk_area + sizeof(CS_STK_CB) + 128)
 # endif /* ibm_lnx */
 
 # if defined(i64_lnx) || defined(a64_lnx) || \
@@ -1103,171 +1103,172 @@ CS_xchng_thread(CS_SCB *scb)
 Missing_machine_dependent_scb_condition!!!
 # endif
 
-    {
-	TRdisplay("Session %p killed due to stack overflow\n", scb);
-	CSremove((CS_SID)scb);	/* perhaps a better action can be taken? */
-    }
-    if (Cs_incomp)
-	CS_breakpoint();
+  {
+    TRdisplay("Session %p killed due to stack overflow\n", scb);
+    CSremove((CS_SID)scb);	/* perhaps a better action can be taken? */
+  }
+
+  if (Cs_incomp)
+    CS_breakpoint();
     
-    /*
-    ** If we just came from the idle thread, it just took care of
-    ** the following "looking for work" stuff, so we won't
-    ** repeat it. (see CS_setup())
-    ** If we came from a terminated session, old_scb can be NULL; don't
-    ** do the poll now, since we'll probably pick the idle thread anyway.
-    */
-    if (old_scb && old_scb != (CS_SCB*)&Cs_idle_scb)
+  /*
+  ** If we just came from the idle thread, it just took care of
+  ** the following "looking for work" stuff, so we won't
+  ** repeat it. (see CS_setup())
+  ** If we came from a terminated session, old_scb can be NULL; don't
+  ** do the poll now, since we'll probably pick the idle thread anyway.
+  */
+  if (old_scb && old_scb != (CS_SCB*)&Cs_idle_scb)
+  {
+    Cs_incomp = 1;
+    tim = 0;
+    (VOID) CS_find_events(&tim, &nevents);
+    CS_checktime();
+    tim = Cs_sm_cb->css_qcount - Cs_lastquant;
+    if (tim)
     {
-        Cs_incomp = 1;
+      Cs_lastquant = Cs_sm_cb->css_qcount;
+      CS_toq_scan(tim, (i4 *)NULL);
+      if ((Cs_nextpoll -= tim) < 0)
+      {
+        Cs_nextpoll = Cs_polldelay;
         tim = 0;
-        (VOID) CS_find_events(&tim, &nevents);
-        CS_checktime();
-        tim = Cs_sm_cb->css_qcount - Cs_lastquant;
-        if (tim)
-        {
-            Cs_lastquant = Cs_sm_cb->css_qcount;
-            CS_toq_scan(tim, (i4 *)NULL);
-            if ((Cs_nextpoll -= tim) < 0)
-            {
-                Cs_nextpoll = Cs_polldelay;
-                tim = 0;
-                if(iiCLpoll(&tim) == E_FAILED)
-                    TRdisplay("CS_xchng_thread: iiCLpoll failed...serious\n");
-            }
-        }
-        Cs_incomp = 0;
+        if (iiCLpoll(&tim) == E_FAILED)
+          TRdisplay("CS_xchng_thread: iiCLpoll failed...serious\n");
+      }
     }
+    Cs_incomp = 0;
+  }
 
-    /*
-    ** Turn on 'inkernel', so asynchronous resumes do not touch ready queues.
-    */
-    Cs_srv_block.cs_inkernel = 1;
+  /*
+  ** Turn on 'inkernel', so asynchronous resumes do not touch ready queues.
+  */
+  Cs_srv_block.cs_inkernel = 1;
 
-    /*
-    ** If the idle thread is the only thing on the ready queues,
-    ** don't waste time scanning for that which won't be found.
-    */
-    if (Cs_srv_block.cs_ready_mask == (CS_PRIORITY_BIT >> CS_PIDLE))
+  /*
+  ** If the idle thread is the only thing on the ready queues,
+  ** don't waste time scanning for that which won't be found.
+  */
+  if (Cs_srv_block.cs_ready_mask == (CS_PRIORITY_BIT >> CS_PIDLE))
+  {
+    new_scb = (CS_SCB*)&Cs_idle_scb;
+    i = CS_PIDLE;
+  }
+  else for (i = CS_PADMIN; i >= CS_PIDLE; i--)
+  {
+    /* wander thru the queues looking for work */
+    if (!(Cs_srv_block.cs_ready_mask & (CS_PRIORITY_BIT >> i)))
+      continue;
+
+    /* For each priority in the system, check for computable threads */
+    for (new_scb = Cs_srv_block.cs_rdy_que[i]->cs_rw_q.cs_q_next;
+      new_scb != Cs_srv_block.cs_rdy_que[i];
+      new_scb = new_scb->cs_rw_q.cs_q_next)
     {
-	new_scb = (CS_SCB*)&Cs_idle_scb;
-	i = CS_PIDLE;
-    }
-    else for (i = CS_PADMIN; i >= CS_PIDLE; i--)
-    {
-	/* wander thru the queues looking for work */
-
-	if (!(Cs_srv_block.cs_ready_mask & (CS_PRIORITY_BIT >> i)))
-	    continue;
-
-	/* For each priority in the system, check for computable threads */
-
-	for (new_scb = Cs_srv_block.cs_rdy_que[i]->cs_rw_q.cs_q_next;
-		new_scb != Cs_srv_block.cs_rdy_que[i];
-		new_scb = new_scb->cs_rw_q.cs_q_next)
-	{
-	    if (new_scb->cs_state == CS_COMPUTABLE)
-	    {
-		break;
-	    }
+      if (new_scb->cs_state == CS_COMPUTABLE)
+      {
+        break;
+      }
 #ifdef	CS_STACK_SHARING
-	    else if ((new_scb->cs_state == CS_STACK_WAIT) && (!oo_stacks))
-	    {
-		STATUS		status;
+      else if ((new_scb->cs_state == CS_STACK_WAIT) && (!oo_stacks))
+      {
+        STATUS status;
 
-		status = CS_alloc_stack(new_scb, &errcode);
-		if (status == OK)
-		{
-		    new_scb->cs_state = CS_COMPUTABLE;
-		    break;
-		}
-		else if (status == E_CS002F_NO_FREE_STACKS)
-		{
-		    oo_stacks = 1;  /* We are out of stacks */
-		    continue;
-		}
-	    }
+        status = CS_alloc_stack(new_scb, &errcode);
+	      
+        if (status == OK)
+        {
+          new_scb->cs_state = CS_COMPUTABLE;
+          break;
+        }
+        else if (status == E_CS002F_NO_FREE_STACKS)
+        {
+          oo_stacks = 1;  /* We are out of stacks */
+          continue;
+        }
+      }
 #endif
-	}
-
-	if (new_scb != Cs_srv_block.cs_rdy_que[i])
-	{
-	    /* then there is a ready job here */
-	    break;
-	}
-	else
-	{
-	    Cs_srv_block.cs_ready_mask &= ~(CS_PRIORITY_BIT >> i);
-	}
     }
 
-    if (new_scb == 0)
+    if (new_scb != Cs_srv_block.cs_rdy_que[i])
     {
-	/*
-	** Serious problems.  The idle job is always ready.
-	*/
-	(*Cs_srv_block.cs_elog)(E_CS0007_RDY_QUE_CORRUPT, (DB_ERROR *)NULL,
-                                NULL, 0);
-	Cs_srv_block.cs_inkernel = 0;
-	if ( Cs_srv_block.cs_async )
-	    CS_move_async(new_scb);
-	Cs_srv_block.cs_state = CS_ERROR;
-	return(scb);
+      /* then there is a ready job here */
+      break;
     }
-    
-    if ((Cs_srv_block.cs_current = new_scb) == (CS_SCB *)&Cs_idle_scb)
+    else
     {
-	Cs_srv_block.cs_state = CS_IDLING;
+      Cs_srv_block.cs_ready_mask &= ~(CS_PRIORITY_BIT >> i);
     }
+  }
 
+  if (new_scb == 0)
+  {
     /*
-    ** If newly picked thread is already last on its ready queue, don't
-    ** unhook/rehook into the same position!. 
+    ** Serious problems.  The idle job is always ready.
     */
-    if (new_scb->cs_rw_q.cs_q_next != Cs_srv_block.cs_rdy_que[i])
-    {
- 	new_scb->cs_rw_q.cs_q_next->cs_rw_q.cs_q_prev =
-	    new_scb->cs_rw_q.cs_q_prev;
-        new_scb->cs_rw_q.cs_q_prev->cs_rw_q.cs_q_next =
-	    new_scb->cs_rw_q.cs_q_next;
-
-	/* and put on tail of ready que by priority */
-	new_scb->cs_rw_q.cs_q_prev =
-	    Cs_srv_block.cs_rdy_que[i]->cs_rw_q.cs_q_prev;
-	new_scb->cs_rw_q.cs_q_next =
-	    Cs_srv_block.cs_rdy_que[i];
-	new_scb->cs_rw_q.cs_q_prev->cs_rw_q.cs_q_next = new_scb;
-	new_scb->cs_rw_q.cs_q_next->cs_rw_q.cs_q_prev = new_scb;
-    }
-
+    (*Cs_srv_block.cs_elog)(E_CS0007_RDY_QUE_CORRUPT, (DB_ERROR *)NULL,
+      NULL, 0);
     Cs_srv_block.cs_inkernel = 0;
+	  
     if ( Cs_srv_block.cs_async )
-	CS_move_async(new_scb);
+      CS_move_async(new_scb);
+    Cs_srv_block.cs_state = CS_ERROR;
+	  
+    return(scb);
+  }
+    
+  if ((Cs_srv_block.cs_current = new_scb) == (CS_SCB *)&Cs_idle_scb)
+  {
+    Cs_srv_block.cs_state = CS_IDLING;
+  }
 
-    /*
-    ** If the old or new thread needs to collect CPU statistics, then we need
-    ** to figure get the DBMS CPU usage.  If the new session is collecting
-    ** statistics, then we need to store the current DBMS CPU time so that
-    ** when we later swap out the session, we can calculate its cpu usage.
-    ** If the old session is collecting cpu stats, then increment its cpu
-    ** usage.
-    */
-    if (old_scb && old_scb->cs_mask & CS_CPU_MASK)
-    {
-	CS_update_cpu((i4 *)0, &old_scb->cs_cputime);
-    }
-    else if (new_scb->cs_mask & CS_CPU_MASK)
-    {
-	CS_update_cpu((i4 *)0, (i4 *)0);
-    }
+  /* 
+  ** If newly picked thread is already last on its ready queue, don't
+  ** unhook/rehook into the same position!. 
+  */
+  if (new_scb->cs_rw_q.cs_q_next != Cs_srv_block.cs_rdy_que[i])
+  {
+    new_scb->cs_rw_q.cs_q_next->cs_rw_q.cs_q_prev =
+      new_scb->cs_rw_q.cs_q_prev;
+    new_scb->cs_rw_q.cs_q_prev->cs_rw_q.cs_q_next =
+      new_scb->cs_rw_q.cs_q_next;
 
+    /* and put on tail of ready que by priority */
+    new_scb->cs_rw_q.cs_q_prev =
+      Cs_srv_block.cs_rdy_que[i]->cs_rw_q.cs_q_prev;
+    new_scb->cs_rw_q.cs_q_next =
+      Cs_srv_block.cs_rdy_que[i];
+    new_scb->cs_rw_q.cs_q_prev->cs_rw_q.cs_q_next = new_scb;
+    new_scb->cs_rw_q.cs_q_next->cs_rw_q.cs_q_prev = new_scb;
+  }
+
+  Cs_srv_block.cs_inkernel = 0;
+
+  if ( Cs_srv_block.cs_async )
+    CS_move_async(new_scb);
+
+  /*
+  ** If the old or new thread needs to collect CPU statistics, then we need
+  ** to figure get the DBMS CPU usage.  If the new session is collecting
+  ** statistics, then we need to store the current DBMS CPU time so that
+  ** when we later swap out the session, we can calculate its cpu usage.
+  ** If the old session is collecting cpu stats, then increment its cpu
+  ** usage.
+  */
+  if (old_scb && old_scb->cs_mask & CS_CPU_MASK)
+  {
+    CS_update_cpu((i4 *)0, &old_scb->cs_cputime);
+  }
+  else if (new_scb->cs_mask & CS_CPU_MASK)
+  {
+    CS_update_cpu((i4 *)0, (i4 *)0);
+  }
 
 #ifdef CS_MIDQUANTUM
-    /* Not being suspended mid quantum so don't set it. */
-    new_scb->cs_mask &= ~CS_MID_QUANTUM_MASK;	/* make sure it is off */
+  /* Not being suspended mid quantum so don't set it. */
+  new_scb->cs_mask &= ~CS_MID_QUANTUM_MASK;	/* make sure it is off */
 #endif
-
-    return(new_scb);    
+  return(new_scb);    
 }
 
 /*{
