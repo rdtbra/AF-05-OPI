@@ -37,6 +37,7 @@
 .globl	_CS_swuser
 .globl   CS_get_sp
 
+/* RDT: 20250817 - _CS_swuser = CS_swuser */ 
 _CS_swuser:
 /* If server in kernel state, no task switching */
 	cmpl	$0, _Cs_srv_block + CS__INKERNEL
